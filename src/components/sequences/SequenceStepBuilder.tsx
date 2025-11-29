@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 export interface BurstTemplateConfig {
 	templateId: string
 	templateName?: string
+	templatePreview?: string
 	variableValues?: Record<string, string>
 }
 
@@ -32,6 +33,8 @@ export interface SequenceStep {
 	type: 'MESSAGE' | 'DELAY'
 	templateId?: string
 	templateName?: string
+	templatePreview?: string
+	variableValues?: Record<string, string>
 	label: string
 	delayValue: number
 	delayUnit: 'MINUTES' | 'HOURS' | 'DAYS'
@@ -65,6 +68,8 @@ export function SequenceStepBuilder({
 			type: stepData.nodeType || 'MESSAGE',
 			templateId: stepData.templateId,
 			templateName: stepData.templateName,
+			templatePreview: stepData.templatePreview,
+			variableValues: stepData.variableValues || {},
 			label: stepData.label || `Step ${steps.length + 1}`,
 			delayValue: stepData.delayValue || 0,
 			delayUnit: stepData.delayUnit || 'MINUTES',
@@ -74,7 +79,10 @@ export function SequenceStepBuilder({
 
 		if (editingIndex !== null) {
 			const newSteps = [...steps]
-			newSteps[editingIndex] = { ...newStep, id: steps[editingIndex].id }
+			newSteps[editingIndex] = {
+				...newStep,
+				id: steps[editingIndex].id,
+			}
 			onChange(newSteps)
 		} else {
 			const newSteps = [...steps, newStep]
@@ -147,7 +155,7 @@ export function SequenceStepBuilder({
 
 	return (
 		<div className={cn('space-y-6', className)}>
-			<Card>
+			<Card className="flex max-h-[60vh] flex-col overflow-visible">
 				<CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 					<div>
 						<CardTitle className="text-lg">Sequence Flow</CardTitle>
@@ -168,8 +176,8 @@ export function SequenceStepBuilder({
 						Add Step
 					</Button>
 				</CardHeader>
-				<CardContent>
-					<div className="flex flex-col items-center overflow-y-auto max-h-[calc(100vh-280px)] pr-2">
+				<CardContent className="flex-1 overflow-y-auto pr-2">
+					<div className="flex flex-col items-center">
 						<div className="px-6 py-2 bg-green-100 text-green-700 rounded-full font-medium border-2 border-green-300">
 							Start
 						</div>
@@ -214,7 +222,7 @@ export function SequenceStepBuilder({
 															</div>
 
 															<div className="w-full max-w-md border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
-																<div className="flex items-center p-4 gap-3">
+																<div className="flex items-center gap-3 p-4">
 																	<div
 																		className="p-1 rounded hover:bg-gray-100 cursor-grab active:cursor-grabbing"
 																		{...dragProvided.dragHandleProps}>
@@ -225,17 +233,25 @@ export function SequenceStepBuilder({
 																		{index + 1}
 																	</div>
 
-																	<div className="flex-1 min-w-0">
+																	<div className="relative flex-1 min-w-0 group">
 																		<div className="font-medium truncate">
 																			{step.templateName || 'No template selected'}
 																		</div>
-																		<div
-																			className={cn(
-																				'text-sm truncate',
-																				step.templateId ? 'text-gray-500' : 'text-orange-500'
-																			)}>
-																			{step.templateId ? 'MESSAGE' : 'No template selected'}
-																		</div>
+																		{!step.templateId && (
+																			<div className="text-sm text-orange-500">
+																				No template selected
+																			</div>
+																		)}
+																		{step.templateId && step.templatePreview && (
+																			<div className="pointer-events-auto absolute left-0 top-full z-20 mt-2 hidden w-72 max-w-[80vw] rounded-md border bg-background p-3 text-sm text-foreground shadow-lg group-hover:block group-focus-within:block">
+																				<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+																					Message preview
+																				</p>
+																				<div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-muted-foreground/90">
+																					{step.templatePreview}
+																				</div>
+																			</div>
+																		)}
 																		{step.burstTemplates && step.burstTemplates.length > 1 && (
 																			<div className="mt-2 flex flex-wrap gap-2">
 																				{step.burstTemplates.map((msg, msgIndex) => (

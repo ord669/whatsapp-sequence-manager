@@ -178,16 +178,21 @@ async function processSubscription(
         return
       }
 
-    await prisma.sentMessage.create({
-      data: {
-        contactId: contact.id,
-        subscriptionId: subscription.id,
+      const metaMessageId =
+        typeof result.messageId === 'number'
+          ? String(result.messageId)
+          : result.messageId || null
+
+      await prisma.sentMessage.create({
+        data: {
+          contactId: contact.id,
+          subscriptionId: subscription.id,
           templateId: entry.templateId,
-        metaMessageId: result.messageId || null,
-        status: 'SENT',
-        sentAt: new Date(),
-      },
-    })
+          metaMessageId,
+          status: 'SENT',
+          sentAt: new Date(),
+        },
+      })
     }
 
     currentIndex += 1

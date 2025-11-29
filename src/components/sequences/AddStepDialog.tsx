@@ -24,6 +24,7 @@ import { useTimeFormat } from '@/contexts/TimeFormatContext'
 interface BurstTemplateConfig {
 	templateId: string
 	templateName?: string
+	templatePreview?: string
 	variableValues?: Record<string, string>
 }
 
@@ -32,6 +33,8 @@ interface EditingStep {
 	type: 'MESSAGE' | 'DELAY'
 	templateId?: string
 	templateName?: string
+	templatePreview?: string
+	variableValues?: Record<string, string>
 	label: string
 	delayValue: number
 	delayUnit: 'MINUTES' | 'HOURS' | 'DAYS'
@@ -99,7 +102,7 @@ export function AddStepDialog({
 						: 1,
 				delayUnit: editingStep.delayUnit || 'DAYS',
 				scheduledTime: editingStep.scheduledTime || '09:00',
-				variableValues: {},
+				variableValues: editingStep.variableValues || {},
 				sendImmediately: editingStep.delayValue === 0,
 			})
 			if (editingStep.burstTemplates && editingStep.burstTemplates.length > 1) {
@@ -146,6 +149,19 @@ export function AddStepDialog({
 		return (template.bodyText.match(/\{\{\d+\}\}/g) || []).map((v: string) =>
 			v.replace(/\{|\}/g, '')
 		)
+	}
+
+	const isVariableValueFilled = (value?: string) =>
+		typeof value === 'string' && value.trim().length > 0
+
+	const hasAllTemplateVariablesFilled = (
+		templateId: string,
+		variableValues: Record<string, string> = {}
+	) => {
+		if (!templateId) return false
+		const variables = getTemplateVariables(templateId)
+		if (variables.length === 0) return true
+		return variables.every((token) => isVariableValueFilled(variableValues[token]))
 	}
 
 	const VARIABLE_OPTIONS = [
@@ -260,6 +276,14 @@ export function AddStepDialog({
 				alert('Please select a template for every burst message')
 				return
 			}
+			if (
+				activeBurst.some(
+					(msg) => !hasAllTemplateVariablesFilled(msg.templateId, msg.variableValues)
+				)
+			) {
+				alert('Please fill all required variables for each burst message')
+				return
+			}
 			burstPayload = activeBurst.map((msg) => {
 				const template = findTemplateById(msg.templateId)
 				return {
@@ -270,6 +294,11 @@ export function AddStepDialog({
 			})
 		} else if (!formData.templateId) {
 			alert('Please select a template')
+			return
+		} else if (
+			!hasAllTemplateVariablesFilled(formData.templateId, formData.variableValues)
+		) {
+			alert('Please fill all required variables')
 			return
 		}
 
@@ -288,17 +317,33 @@ export function AddStepDialog({
 			scheduledTime,
 		}
 
+		let previewText = ''
+
 		if (burstPayload) {
 			stepData.burstTemplates = burstPayload
 			stepData.templateId = burstPayload[0]?.templateId
 			stepData.templateName = burstPayload[0]?.templateName
 			stepData.variableValues = burstPayload[0]?.variableValues || {}
 			stepData.label = `📧 ${burstPayload[0]?.templateName || 'Burst Step'}`
+			previewText = burstPayload
+				.map((msg, idx) => {
+					const template = findTemplateById(msg.templateId)
+					return template?.bodyText
+						? `Message ${idx + 1}:\n${template.bodyText}`
+						: msg.templateName || `Message ${idx + 1}`
+				})
+				.filter(Boolean)
+				.join('\n\n')
 		} else {
 		stepData.templateId = formData.templateId
 		stepData.templateName = selectedTemplate?.name
 		stepData.variableValues = formData.variableValues
 		stepData.label = `📧 ${selectedTemplate?.name}`
+			previewText = selectedTemplate?.bodyText || ''
+		}
+
+		if (previewText) {
+			stepData.templatePreview = previewText
 		}
 
 		// Support both callback names
@@ -349,9 +394,17 @@ export function AddStepDialog({
 		</div>
 	)
 
-	const canSubmit = isBurstEnabled
-		? burstMessagesToRender.every((msg) => !!msg.templateId)
-		: !!formData.templateId
+	const singleTemplateReady =
+		!!formData.templateId &&
+		hasAllTemplateVariablesFilled(formData.templateId, formData.variableValues)
+
+	const burstTemplatesReady = burstMessagesToRender.every(
+		(msg) =>
+			!!msg.templateId &&
+			hasAllTemplateVariablesFilled(msg.templateId, msg.variableValues)
+	)
+
+	const canSubmit = isBurstEnabled ? burstTemplatesReady : singleTemplateReady
 
 	const renderSingleMessageConfigurator = () => (
 				<div className="space-y-4">
