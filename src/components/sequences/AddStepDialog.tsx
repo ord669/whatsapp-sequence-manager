@@ -148,6 +148,13 @@ export function AddStepDialog({
 		)
 	}
 
+	const VARIABLE_OPTIONS = [
+		{ value: '{firstName}', label: 'Contact First Name' },
+		{ value: '{lastName}', label: 'Contact Last Name' },
+		{ value: '{phoneNumber}', label: 'Contact Phone' },
+		{ value: '{offer}', label: 'Offer they see' },
+	] as const
+
 	const renderVariableInputs = (
 		templateId: string,
 		variableValues: Record<string, string>,
@@ -159,24 +166,53 @@ export function AddStepDialog({
 		return (
 			<div className="space-y-3">
 				<Label>Map Variables</Label>
-				{variables.map((varNum: string) => (
-					<div key={varNum} className="grid grid-cols-3 gap-2 items-center">
-						<Label className="text-xs">{`{{${varNum}}}`}</Label>
-						<Select
-							value={variableValues[varNum] || ''}
-							onValueChange={(value) => onChange(varNum, value)}>
-							<SelectTrigger className="col-span-2">
-								<SelectValue placeholder="Select value" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="{firstName}">Contact First Name</SelectItem>
-								<SelectItem value="{lastName}">Contact Last Name</SelectItem>
-								<SelectItem value="{phoneNumber}">Contact Phone</SelectItem>
-								<SelectItem value="Custom">Custom Value...</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-				))}
+				{variables.map((varNum: string) => {
+					const currentValue = variableValues[varNum] || ''
+					const isBuiltIn = VARIABLE_OPTIONS.some((option) => option.value === currentValue)
+					const selectValue = currentValue
+						? isBuiltIn
+							? currentValue
+							: 'Custom'
+						: ''
+
+					return (
+						<div key={varNum} className="grid grid-cols-3 gap-2 items-center">
+							<Label className="text-xs">{`{{${varNum}}}`}</Label>
+							<div className="col-span-2 space-y-2">
+								<Select
+									value={selectValue}
+									onValueChange={(value) => {
+										if (value === 'Custom') {
+											if (!currentValue || isBuiltIn) {
+												onChange(varNum, '')
+											}
+										} else {
+											onChange(varNum, value)
+										}
+									}}>
+									<SelectTrigger>
+										<SelectValue placeholder="Select value" />
+									</SelectTrigger>
+									<SelectContent>
+										{VARIABLE_OPTIONS.map((option) => (
+											<SelectItem key={option.value} value={option.value}>
+												{option.label}
+											</SelectItem>
+										))}
+										<SelectItem value="Custom">Custom Value...</SelectItem>
+									</SelectContent>
+								</Select>
+								{selectValue === 'Custom' && (
+									<Input
+										placeholder="Enter custom value"
+										value={currentValue}
+										onChange={(e) => onChange(varNum, e.target.value)}
+									/>
+								)}
+							</div>
+						</div>
+					)
+				})}
 			</div>
 		)
 	}

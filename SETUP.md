@@ -254,6 +254,10 @@ DATABASE_URL="postgresql://ordvir@localhost:5432/whatsapp_sequence_manager"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 WEBHOOK_VERIFY_TOKEN="wa-seq-webhook-token-2024"
 CHATWOOT_BASE_URL="https://cw.i3c.uk"
+CHATWOOT_ACCOUNT_ID="123"
+CHATWOOT_API_ACCESS_TOKEN="abc123"
+CHATWOOT_ACCOUNT_LABEL="Default Chatwoot"
+CHATWOOT_ACCOUNT_PHONE="+15551234567"
 ```
 
 ### Business Hours

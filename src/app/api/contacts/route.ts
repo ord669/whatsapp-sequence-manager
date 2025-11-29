@@ -118,7 +118,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { phoneNumber, firstName, lastName } = body
+    const { phoneNumber, firstName, lastName, offer } = body
 
     if (!phoneNumber || !firstName || !lastName) {
       return NextResponse.json(
@@ -142,11 +142,17 @@ export async function POST(request: Request) {
       )
     }
 
+    const sanitizedOffer =
+      typeof offer === 'string' && offer.trim().length > 0
+        ? offer.trim()
+        : null
+
     const contact = await prisma.contact.create({
       data: {
         phoneNumber: parsedPhone,
         firstName,
         lastName,
+        offer: sanitizedOffer,
       },
     })
 

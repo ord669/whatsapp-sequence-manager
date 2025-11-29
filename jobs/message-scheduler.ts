@@ -10,6 +10,7 @@ import {
 } from '@prisma/client'
 
 import { logger, toError } from '../src/lib/logger'
+import { resolveChatwootCredentials } from '../src/lib/chatwoot'
 
 const prisma = new PrismaClient()
 const jobLogger = logger.child({ module: 'message-scheduler' })
@@ -323,17 +324,36 @@ async function sendTemplateMessage(
       return { success: false, error: 'Template not found' }
     }
 
+    const variableValuesOverride = options?.variableValues
+    const activeVariableValues =
+      variableValuesOverride ||
+      ((step.variableValues as Record<string, string> | null) || {})
+
+    const requiresOfferLookup = variableValuesRequireOffer(activeVariableValues)
+    let contactWithOffer = contact
+
+    if (requiresOfferLookup) {
+      const ensuredOffer = await ensureOfferValue(metaAccount, contact)
+      if (!ensuredOffer) {
+        return {
+          success: false,
+          error: `Offer is required for template "${template.name}" but could not be resolved for contact ${contact.firstName} ${contact.lastName} (${contact.phoneNumber})`,
+        }
+      }
+      contactWithOffer = { ...contact, offer: ensuredOffer }
+    }
+
     const { parameters, processedBodyParams } = buildTemplateParameters(
       template,
       step,
-      contact,
-      options?.variableValues
+      contactWithOffer,
+      variableValuesOverride
     )
 
-    if (shouldUseChatwoot(metaAccount, contact)) {
+    if (shouldUseChatwoot(metaAccount, contactWithOffer)) {
       return await sendChatwootTemplateMessage({
         metaAccount,
-        contact,
+        contact: contactWithOffer,
         template,
         processedBodyParams,
       })
@@ -341,7 +361,7 @@ async function sendTemplateMessage(
 
     return await sendMetaTemplateMessage({
       metaAccount,
-      contact,
+      contact: contactWithOffer,
       template,
       parameters,
     })
@@ -380,6 +400,7 @@ function buildTemplateParameters(
     if (value === '{firstName}') value = contact.firstName
     if (value === '{lastName}') value = contact.lastName
     if (value === '{phoneNumber}') value = contact.phoneNumber
+    if (value === '{offer}') value = contact.offer || ''
 
     const resolved = value || 'N/A'
 
@@ -394,12 +415,161 @@ function buildTemplateParameters(
   return { parameters, processedBodyParams }
 }
 
-function shouldUseChatwoot(metaAccount: MetaAccount, contact: Contact) {
-  return (
-    !!metaAccount.chatwootAccountId &&
-    !!metaAccount.chatwootApiAccessToken &&
-    !!contact.chatwootConversationId
+function variableValuesRequireOffer(
+  variableValues?: Record<string, string> | null
+) {
+  if (!variableValues) return false
+  return Object.values(variableValues).some(
+    (value) => typeof value === 'string' && value.trim() === '{offer}'
   )
+}
+
+async function ensureOfferValue(metaAccount: MetaAccount, contact: Contact) {
+  const existingOffer = contact.offer?.trim()
+  if (existingOffer) {
+    return existingOffer
+  }
+
+  const fetchedOffer = await fetchOfferFromChatwoot(metaAccount, contact)
+  if (fetchedOffer) {
+    const normalized = fetchedOffer.trim()
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { offer: normalized },
+    })
+    return normalized
+  }
+
+  return null
+}
+
+async function fetchOfferFromChatwoot(
+  metaAccount: MetaAccount,
+  contact: Contact
+) {
+  if (!contact.chatwootContactId && !contact.chatwootConversationId) {
+    return null
+  }
+
+  const chatwootCredentials = resolveChatwootCredentials(metaAccount)
+  if (!chatwootCredentials) {
+    return null
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Api-Access-Token': chatwootCredentials.apiAccessToken,
+  }
+  const accountId = chatwootCredentials.accountId
+
+  const logger = jobLogger.child({
+    contactId: contact.id,
+    chatwootContactId: contact.chatwootContactId,
+    chatwootConversationId: contact.chatwootConversationId,
+    chatwootAccountId: accountId,
+  })
+
+  const endpoints: Array<{ label: string; url: string }> = []
+
+  if (contact.chatwootContactId) {
+    endpoints.push({
+      label: 'contact',
+      url: `${CHATWOOT_BASE_URL}/api/v1/accounts/${accountId}/contacts/${contact.chatwootContactId}`,
+    })
+  }
+
+  if (contact.chatwootConversationId) {
+    endpoints.push({
+      label: 'conversation',
+      url: `${CHATWOOT_BASE_URL}/api/v1/accounts/${accountId}/conversations/${contact.chatwootConversationId}`,
+    })
+  }
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await axios.get(endpoint.url, { headers })
+      const offer = extractOfferFromChatwootPayload(response.data)
+      if (offer) {
+        logger.info(
+          { endpoint: endpoint.label },
+          'Resolved offer value from Chatwoot'
+        )
+        return offer
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          endpoint: endpoint.label,
+          url: endpoint.url,
+          err: toError(error),
+        },
+        'Failed to fetch offer from Chatwoot endpoint'
+      )
+    }
+  }
+
+  return null
+}
+
+function extractOfferFromChatwootPayload(payload: unknown): string | null {
+  return findOfferInValue(payload, 0)
+}
+
+function findOfferInValue(value: unknown, depth: number): string | null {
+  if (depth > 6 || value === null || value === undefined) {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const result = findOfferInValue(item, depth + 1)
+      if (result) return result
+    }
+    return null
+  }
+
+  if (typeof value !== 'object') {
+    return null
+  }
+
+  const obj = value as Record<string, unknown>
+
+  for (const key of Object.keys(obj)) {
+    const normalizedKey = key.toLowerCase()
+    if (normalizedKey.includes('offer')) {
+      const candidate = obj[key]
+      if (
+        typeof candidate === 'string' ||
+        typeof candidate === 'number' ||
+        typeof candidate === 'boolean'
+      ) {
+        const normalized = String(candidate).trim()
+        if (normalized.length > 0) return normalized
+      }
+      const result = findOfferInValue(candidate, depth + 1)
+      if (result) return result
+    }
+  }
+
+  for (const key of Object.keys(obj)) {
+    const nestedValue = obj[key]
+    if (typeof nestedValue === 'object' && nestedValue !== null) {
+      const nestedResult = findOfferInValue(nestedValue, depth + 1)
+      if (nestedResult) return nestedResult
+    }
+  }
+
+  return null
+}
+
+function shouldUseChatwoot(metaAccount: MetaAccount, contact: Contact) {
+  const credentials = resolveChatwootCredentials(metaAccount)
+  return Boolean(credentials && contact.chatwootConversationId)
 }
 
 async function sendMetaTemplateMessage({
@@ -462,10 +632,11 @@ async function sendChatwootTemplateMessage({
   template: Template
   processedBodyParams: Record<string, string>
 }): Promise<TemplateMessageResult> {
-  if (!metaAccount.chatwootAccountId || !metaAccount.chatwootApiAccessToken) {
+  const chatwootCredentials = resolveChatwootCredentials(metaAccount)
+  if (!chatwootCredentials) {
     return {
       success: false,
-      error: 'Chatwoot credentials are missing on the Meta account record',
+      error: 'Chatwoot credentials are not configured',
     }
   }
 
@@ -494,12 +665,12 @@ async function sendChatwootTemplateMessage({
     }
 
     const response = await axios.post(
-      `${CHATWOOT_BASE_URL}/api/v1/accounts/${metaAccount.chatwootAccountId}/conversations/${contact.chatwootConversationId}/messages`,
+      `${CHATWOOT_BASE_URL}/api/v1/accounts/${chatwootCredentials.accountId}/conversations/${contact.chatwootConversationId}/messages`,
       payload,
       {
         headers: {
           'Content-Type': 'application/json',
-          'Api-Access-Token': metaAccount.chatwootApiAccessToken,
+          'Api-Access-Token': chatwootCredentials.apiAccessToken,
         },
       }
     )

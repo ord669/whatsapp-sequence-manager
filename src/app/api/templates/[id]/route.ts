@@ -76,29 +76,61 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json()
-    const folderId: string | null =
-      body.folderId === undefined || body.folderId === null || body.folderId === ''
-        ? null
-        : body.folderId
+    const updateData: any = {}
 
-    if (folderId) {
-      const folderExists = await prisma.templateFolder.findUnique({
-        where: { id: folderId },
-      })
+    if ('folderId' in body) {
+      const folderId: string | null =
+        body.folderId === undefined || body.folderId === null || body.folderId === ''
+          ? null
+          : body.folderId
 
-      if (!folderExists) {
-        return NextResponse.json(
-          { error: 'Folder not found' },
-          { status: 404 }
-        )
+      if (folderId) {
+        const folderExists = await prisma.templateFolder.findUnique({
+          where: { id: folderId },
+        })
+
+        if (!folderExists) {
+          return NextResponse.json(
+            { error: 'Folder not found' },
+            { status: 404 }
+          )
+        }
       }
+
+      updateData.folderId = folderId
+    }
+
+    const allowedFields: Array<
+      'name' | 'category' | 'language' | 'bodyText' | 'footerText' | 'variables'
+    > = [
+      'name',
+      'category',
+      'language',
+      'bodyText',
+      'footerText',
+      'variables',
+    ]
+
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        if (field === 'footerText') {
+          updateData.footerText = body.footerText || null
+        } else {
+          updateData[field] = body[field]
+        }
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
     }
 
     const template = await prisma.template.update({
       where: { id: params.id },
-      data: {
-        folderId,
-      },
+      data: updateData,
       include: {
         metaAccount: {
           select: {

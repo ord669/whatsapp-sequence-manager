@@ -15,6 +15,7 @@ interface AddContactDialogProps {
     phoneNumber: string
     firstName: string
     lastName: string
+    offer?: string | null
   }
 }
 
@@ -24,6 +25,7 @@ export function AddContactDialog({ open, onOpenChange, contact }: AddContactDial
     phoneNumber: contact?.phoneNumber || '',
     firstName: contact?.firstName || '',
     lastName: contact?.lastName || '',
+    offer: contact?.offer || '',
   })
 
   const createMutation = useMutation({
@@ -71,6 +73,7 @@ export function AddContactDialog({ open, onOpenChange, contact }: AddContactDial
       phoneNumber: '',
       firstName: '',
       lastName: '',
+      offer: '',
     })
   }
 
@@ -138,6 +141,23 @@ export function AddContactDialog({ open, onOpenChange, contact }: AddContactDial
               }
               placeholder="Doe"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="offer">Offer they see (optional)</Label>
+            <Input
+              id="offer"
+              value={formData.offer}
+              onChange={(e) =>
+                setFormData({ ...formData, offer: e.target.value })
+              }
+              placeholder="Spring promo, VIP bundle, etc."
+            />
+            <p className="text-xs text-muted-foreground">
+              Mirrors the Chatwoot custom attribute “offer_they_see”. Templates
+              referencing the Offer variable will use this value, and we’ll
+              auto-fetch it from Chatwoot when possible.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2">

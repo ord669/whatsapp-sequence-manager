@@ -55,6 +55,7 @@ model Contact {
   phoneNumber            String   @unique // E.164 format: +1234567890
   firstName              String
   lastName               String
+  offer                  String?
   chatwootContactId      String?
   chatwootInboxId        String?
   chatwootSourceId       String?

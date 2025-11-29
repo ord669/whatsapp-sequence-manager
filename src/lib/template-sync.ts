@@ -100,7 +100,7 @@ export async function syncTemplatesForMetaAccount(
       }
     })
 
-    const templateData = {
+    const templateBaseData = {
       name: metaTemplate.name
         .split('_')
         .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -121,18 +121,20 @@ export async function syncTemplatesForMetaAccount(
       buttons,
       variables,
       metaTemplateId: metaTemplate.id,
-      metaAccountId: metaAccount.id,
     }
 
     if (existing) {
       await prisma.template.update({
         where: { id: existing.id },
-        data: templateData,
+        data: templateBaseData,
       })
       updated++
     } else {
       await prisma.template.create({
-        data: templateData,
+        data: {
+          ...templateBaseData,
+          metaAccountId: metaAccount.id,
+        },
       })
       synced++
     }

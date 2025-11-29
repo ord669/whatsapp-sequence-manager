@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Plus, Search, Users, Upload } from 'lucide-react'
+import { Plus, RefreshCw, Search, Users, Upload } from 'lucide-react'
 import { AddContactDialog } from '@/components/contacts/AddContactDialog'
 import { BulkUnsubscribeDialog } from '@/components/contacts/BulkUnsubscribeDialog'
 import { ContactRow } from '@/components/contacts/ContactRow'
@@ -26,6 +26,7 @@ interface Contact {
 	phoneNumber: string
 	firstName: string
 	lastName: string
+	offer?: string | null
 	createdAt: string
 	chatwootConversationId?: string | null
 	chatwootInboxId?: string | null
@@ -43,6 +44,22 @@ interface Contact {
 	}
 }
 
+interface ChatwootSyncSummaryEntry {
+	metaAccountId: string
+	displayName: string
+	phoneNumber: string
+	status: 'success' | 'error'
+	created?: number
+	updated?: number
+	skipped?: number
+	error?: string
+}
+
+interface ChatwootSyncResponse {
+	success: boolean
+	summary: ChatwootSyncSummaryEntry[]
+}
+
 export default function ContactsPage() {
 	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 	const [searchQuery, setSearchQuery] = useState('')
@@ -51,6 +68,7 @@ export default function ContactsPage() {
 	const [isBulkUnsubscribeOpen, setIsBulkUnsubscribeOpen] = useState(false)
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 	const [deleteConfirmation, setDeleteConfirmation] = useState('')
+	const [syncingContactId, setSyncingContactId] = useState<string | null>(null)
 	const queryClient = useQueryClient()
 
 	const { data: contacts, isLoading } = useQuery<Contact[]>({
@@ -62,6 +80,44 @@ export default function ContactsPage() {
 			const res = await fetch(`/api/contacts?${params}`)
 			if (!res.ok) throw new Error('Failed to fetch contacts')
 			return res.json()
+		},
+	})
+
+	const syncContactsMutation = useMutation({
+		mutationFn: async (): Promise<ChatwootSyncResponse> => {
+			const res = await fetch('/api/contacts/sync', { method: 'POST' })
+			const data = await res.json()
+			if (!res.ok) {
+				throw new Error(data.error || 'Failed to sync contacts from Chatwoot')
+			}
+			return data
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['contacts'] })
+		},
+	})
+
+	const syncContactMutation = useMutation({
+		mutationFn: async (contactId: string) => {
+			const res = await fetch('/api/contacts/sync', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ contactId }),
+			})
+			const data = await res.json().catch(() => ({}))
+			if (!res.ok) {
+				throw new Error(data.error || 'Failed to sync contact from Chatwoot')
+			}
+			return data
+		},
+		onMutate: (contactId) => {
+			setSyncingContactId(contactId)
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['contacts'] })
+		},
+		onSettled: () => {
+			setSyncingContactId(null)
 		},
 	})
 
@@ -170,6 +226,12 @@ export default function ContactsPage() {
 		? 'indeterminate'
 		: false
 
+	const syncSummary = syncContactsMutation.data?.summary ?? []
+	const successfulSyncs = syncSummary.filter((entry) => entry.status === 'success')
+	const failedSyncs = syncSummary.filter((entry) => entry.status === 'error')
+	const totalCreatedFromSync = successfulSyncs.reduce((sum, entry) => sum + (entry.created ?? 0), 0)
+	const totalUpdatedFromSync = successfulSyncs.reduce((sum, entry) => sum + (entry.updated ?? 0), 0)
+
 	return (
 		<PageChrome
 			title="Contacts"
@@ -191,6 +253,18 @@ export default function ContactsPage() {
 						<Button variant="outline" className="rounded-full">
 							<Upload className="mr-2 h-4 w-4" />
 							Import CSV
+						</Button>
+						<Button
+							variant="secondary"
+							className="rounded-full"
+							onClick={() => syncContactsMutation.mutate()}
+							disabled={syncContactsMutation.isPending}>
+							<RefreshCw
+								className={`mr-2 h-4 w-4 ${
+									syncContactsMutation.isPending ? 'animate-spin' : ''
+								}`}
+							/>
+							{syncContactsMutation.isPending ? 'Syncing…' : 'Sync Chatwoot'}
 						</Button>
 						<Button className="rounded-full" onClick={() => setIsAddDialogOpen(true)}>
 							<Plus className="mr-2 h-4 w-4" />
@@ -241,6 +315,32 @@ export default function ContactsPage() {
 				</div>
 			}>
 			<div className="flex flex-1 min-h-0 flex-col">
+				{syncContactsMutation.isError && (
+					<div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+						{(syncContactsMutation.error as Error).message}
+					</div>
+				)}
+
+				{syncContactMutation.isError && (
+					<div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+						{(syncContactMutation.error as Error).message}
+					</div>
+				)}
+
+				{syncContactsMutation.isSuccess && successfulSyncs.length > 0 && (
+					<div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+						Synced contacts from {successfulSyncs.length}{' '}
+						{successfulSyncs.length === 1 ? 'account' : 'accounts'}. Created {totalCreatedFromSync}{' '}
+						and updated {totalUpdatedFromSync}.
+						{failedSyncs.length > 0 && (
+							<span className="ml-2 text-amber-700">
+								{failedSyncs.length} account{failedSyncs.length === 1 ? '' : 's'} failed. Check server
+								logs for details.
+							</span>
+						)}
+					</div>
+				)}
+
 				{isLoading ? (
 					<div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 text-sm text-muted-foreground">
 						Loading contacts...
@@ -275,6 +375,7 @@ export default function ContactsPage() {
 												</th>
 												<th className="px-6 py-3 text-left font-semibold">Contact</th>
 												<th className="px-6 py-3 text-left font-semibold">Phone Number</th>
+												<th className="px-6 py-3 text-left font-semibold">Offer they see</th>
 												<th className="px-6 py-3 text-left font-semibold">Chatwoot</th>
 												<th className="px-6 py-3 text-left font-semibold">Active Sequences</th>
 												<th className="px-6 py-3 text-left font-semibold">Added</th>
@@ -293,6 +394,12 @@ export default function ContactsPage() {
 															: undefined
 													}
 													disableUnsubscribe={singleUnsubscribeMutation.isPending}
+													onSync={
+														contact.chatwootContactId
+															? () => syncContactMutation.mutate(contact.id)
+															: undefined
+													}
+													isSyncing={syncingContactId === contact.id && syncContactMutation.isPending}
 													isSelected={selectedContacts.includes(contact.id)}
 													onSelectChange={(checked) => handleSelectContact(contact.id, checked)}
 												/>

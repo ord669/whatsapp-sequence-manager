@@ -44,6 +44,10 @@ DATABASE_URL="postgresql://user:password@localhost:5432/whatsapp_sequence_manage
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 WEBHOOK_VERIFY_TOKEN="your-webhook-verify-token"
 CHATWOOT_BASE_URL="https://cw.i3c.uk"
+CHATWOOT_ACCOUNT_ID="123" # Optional fallback when no Meta account is linked
+CHATWOOT_API_ACCESS_TOKEN="abc123" # Required if ACCOUNT_ID is set
+CHATWOOT_ACCOUNT_LABEL="Default Chatwoot" # Optional display label
+CHATWOOT_ACCOUNT_PHONE="+15551234567" # Optional phone label
 LOG_LEVEL="debug" # Optional: debug, info, warn, error, ...
 LOG_SERVICE_NAME="whatsapp-sequence-manager"
 ```

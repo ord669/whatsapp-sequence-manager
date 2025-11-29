@@ -17,19 +17,18 @@ type ChatwootSender =
 
 function deriveNames(name?: string | null) {
 	const fallbackFirst = 'Unknown'
-	const fallbackLast = 'Contact'
 
 	if (!name) {
-		return { firstName: fallbackFirst, lastName: fallbackLast }
+		return { firstName: fallbackFirst, lastName: '' }
 	}
 
 	const parts = name.trim().split(/\s+/).filter(Boolean)
 	if (parts.length === 0) {
-		return { firstName: fallbackFirst, lastName: fallbackLast }
+		return { firstName: fallbackFirst, lastName: '' }
 	}
 
 	if (parts.length === 1) {
-		return { firstName: parts[0], lastName: fallbackLast }
+		return { firstName: parts[0], lastName: '' }
 	}
 
 	return {

@@ -48,13 +48,17 @@ export async function PUT(
 ) {
 	try {
 		const body = await request.json()
-		const { firstName, lastName } = body
+		const { firstName, lastName, offer } = body
+
+		const sanitizedOffer =
+			typeof offer === 'string' && offer.trim().length > 0 ? offer.trim() : null
 
 		const contact = await prisma.contact.update({
 			where: { id: params.contactId },
 			data: {
 				firstName,
 				lastName,
+				offer: sanitizedOffer,
 			},
 		})
 

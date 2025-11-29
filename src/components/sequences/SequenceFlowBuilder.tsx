@@ -89,6 +89,7 @@ function SequenceFlowBuilderInner({
 	const historyRef = useRef<HistoryState[]>([])
 	const historyIndexRef = useRef(-1)
 	const isUndoRedoRef = useRef(false)
+	const historyInitializedRef = useRef(false)
 	const [canUndo, setCanUndo] = useState(false)
 	const [canRedo, setCanRedo] = useState(false)
 
@@ -155,14 +156,15 @@ function SequenceFlowBuilderInner({
 
 	// Initialize history with starting state
 	useEffect(() => {
-		if (historyRef.current.length === 0) {
-			historyRef.current.push({
-				nodes: JSON.parse(JSON.stringify(nodes)),
-				edges: JSON.parse(JSON.stringify(edges)),
-			})
-			historyIndexRef.current = 0
-		}
-	}, []) // Only run once on mount
+		if (historyInitializedRef.current) return
+
+		historyRef.current.push({
+			nodes: JSON.parse(JSON.stringify(nodes)),
+			edges: JSON.parse(JSON.stringify(edges)),
+		})
+		historyIndexRef.current = 0
+		historyInitializedRef.current = true
+	}, [nodes, edges])
 
 	// Keyboard shortcuts for undo/redo
 	useEffect(() => {

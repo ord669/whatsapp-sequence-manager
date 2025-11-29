@@ -13,6 +13,7 @@ import {
 	XCircle,
 	Phone,
 	MessageCircle,
+	RefreshCw,
 } from 'lucide-react'
 import { cn, formatPhoneNumber } from '@/lib/utils'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -30,6 +31,7 @@ interface ContactRowProps {
 		phoneNumber: string
 		firstName: string
 		lastName: string
+		offer?: string | null
 		chatwootConversationId?: string | null
 		chatwootInboxId?: string | null
 		chatwootSourceId?: string | null
@@ -51,6 +53,8 @@ interface ContactRowProps {
 	onDelete: () => void
 	onUnsubscribe?: () => void
 	disableUnsubscribe?: boolean
+	onSync?: () => void
+	isSyncing?: boolean
 	isSelected: boolean
 	onSelectChange: (value: boolean) => void
 }
@@ -60,13 +64,19 @@ export function ContactRow({
 	onDelete,
 	onUnsubscribe,
 	disableUnsubscribe,
+	onSync,
+	isSyncing,
 	isSelected,
 	onSelectChange,
 }: ContactRowProps) {
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 	const createdDate = new Date(contact.createdAt)
 	const relativeCreatedDate = formatDistanceToNow(createdDate, { addSuffix: true })
-	const hasChatwootLink = Boolean(contact.chatwootConversationId)
+	const hasChatwootConversation = Boolean(contact.chatwootConversationId)
+	const hasChatwootContact = Boolean(contact.chatwootContactId)
+	const hasChatwootData =
+		hasChatwootConversation || hasChatwootContact || Boolean(contact.chatwootInboxId || contact.chatwootSourceId)
+	const offerLabel = contact.offer?.trim() || ''
 
 	return (
 		<>
@@ -89,16 +99,36 @@ export function ContactRow({
 						<span>{formatPhoneNumber(contact.phoneNumber)}</span>
 					</div>
 				</td>
+				<td className="px-6 py-4">
+					{offerLabel ? (
+						<div className="text-sm font-medium text-foreground">{offerLabel}</div>
+					) : (
+						<span className="text-xs uppercase tracking-wide text-muted-foreground">Not set</span>
+					)}
+				</td>
 				<td className="px-6 py-4 text-sm text-muted-foreground">
-					{hasChatwootLink ? (
+					{hasChatwootData ? (
 						<div className="group relative inline-flex w-fit items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-50/80 px-3 py-1 text-[0.75rem] font-semibold text-emerald-700 shadow-sm transition-colors dark:bg-emerald-500/15">
 							<MessageCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-							<span>Connected</span>
+							<span>{hasChatwootConversation ? 'Conversation linked' : 'Contact linked'}</span>
 							<div className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 hidden w-64 -translate-x-1/2 flex-col rounded-xl border border-border/70 bg-background p-3 text-xs text-foreground shadow-xl ring-1 ring-black/5 group-hover:flex">
-								<div className="font-semibold text-sm text-foreground">
-									Conversation #{contact.chatwootConversationId}
-								</div>
-								<div className="mt-2 space-y-1 text-muted-foreground">
+								<div className="space-y-1 text-muted-foreground">
+									{contact.chatwootConversationId && (
+										<div className="flex items-center justify-between">
+											<span className="text-[0.65rem] uppercase tracking-wide">Conversation</span>
+											<span className="font-medium text-foreground">
+												#{contact.chatwootConversationId}
+											</span>
+										</div>
+									)}
+									{contact.chatwootContactId && (
+										<div className="flex items-center justify-between">
+											<span className="text-[0.65rem] uppercase tracking-wide">Contact</span>
+											<span className="font-medium text-foreground">
+												#{contact.chatwootContactId}
+											</span>
+										</div>
+									)}
 									{contact.chatwootInboxId && (
 										<div className="flex items-center justify-between">
 											<span className="text-[0.65rem] uppercase tracking-wide">
@@ -177,6 +207,16 @@ export function ContactRow({
 									className="text-amber-600 focus:text-amber-600">
 									<XCircle className="mr-2 h-4 w-4" />
 									Unsubscribe
+								</DropdownMenuItem>
+							)}
+							{onSync && (
+								<DropdownMenuItem onClick={onSync} disabled={isSyncing}>
+									<RefreshCw
+										className={`mr-2 h-4 w-4 ${
+											isSyncing ? 'animate-spin text-primary' : ''
+										}`}
+									/>
+									{isSyncing ? 'Syncing…' : 'Sync from Chatwoot'}
 								</DropdownMenuItem>
 							)}
 							<DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>

@@ -184,7 +184,7 @@ export function SequenceStepBuilder({
 										{steps.length === 0 ? (
 											<div className="my-8 text-center text-muted-foreground">
 												<p>No steps yet.</p>
-												<p className="text-sm">Click "Add Step" to get started.</p>
+												<p className="text-sm">Click &ldquo;Add Step&rdquo; to get started.</p>
 											</div>
 										) : (
 											steps.map((step, index) => (

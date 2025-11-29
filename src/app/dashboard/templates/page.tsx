@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
-	Plus,
 	Search,
 	FileText,
 	FolderPlus,
@@ -21,7 +21,6 @@ import {
 	X,
 	ChevronRight,
 } from 'lucide-react'
-import { AddTemplateDialog } from '@/components/templates/AddTemplateDialog'
 import { AddFolderDialog } from '@/components/templates/AddFolderDialog'
 import {
 	DropdownMenu,
@@ -74,8 +73,70 @@ type FolderRow = {
 	count: number
 }
 
+const LONG_TEXT_THRESHOLD = 120
+
+const TemplateBodyCell = ({ bodyText }: { bodyText: string }) => {
+	const anchorRef = useRef<HTMLDivElement | null>(null)
+	const [isHovering, setIsHovering] = useState(false)
+	const [coords, setCoords] = useState({ top: 0, left: 0 })
+	const showPreview = bodyText.length > LONG_TEXT_THRESHOLD
+
+	const updatePosition = useCallback(() => {
+		const rect = anchorRef.current?.getBoundingClientRect()
+		if (!rect) return
+		setCoords({
+			top: rect.bottom + 12,
+			left: rect.left + rect.width / 2,
+		})
+	}, [])
+
+	useEffect(() => {
+		if (!isHovering) return
+		const handleReposition = () => updatePosition()
+		window.addEventListener('scroll', handleReposition, true)
+		window.addEventListener('resize', handleReposition)
+		return () => {
+			window.removeEventListener('scroll', handleReposition, true)
+			window.removeEventListener('resize', handleReposition)
+		}
+	}, [isHovering, updatePosition])
+
+	const handleMouseEnter = () => {
+		if (!showPreview) return
+		updatePosition()
+		setIsHovering(true)
+	}
+
+	const handleMouseLeave = () => setIsHovering(false)
+
+	return (
+		<>
+			<div
+				ref={anchorRef}
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
+				className="text-sm text-muted-foreground">
+				<p className="line-clamp-2">{bodyText}</p>
+			</div>
+			{showPreview && isHovering && typeof document !== 'undefined'
+				? createPortal(
+						<div
+							className="pointer-events-none fixed z-[9999] max-w-md rounded-2xl bg-foreground px-4 py-3 text-xs font-medium text-background shadow-2xl"
+							style={{
+								top: coords.top,
+								left: coords.left,
+								transform: 'translateX(-50%)',
+							}}>
+							{bodyText}
+						</div>,
+						document.body
+				  )
+				: null}
+		</>
+	)
+}
+
 export default function TemplatesPage() {
-	const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
 	const [isAddFolderDialogOpen, setIsAddFolderDialogOpen] = useState(false)
 	const [searchQuery, setSearchQuery] = useState('')
 	const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -378,10 +439,6 @@ export default function TemplatesPage() {
 					<FolderPlus className="mr-2 h-4 w-4" />
 					Create Folder
 				</Button>
-				<Button className="rounded-full" onClick={() => setIsAddDialogOpen(true)}>
-					<Plus className="mr-2 h-4 w-4" />
-					Create Template
-				</Button>
 			</div>
 
 			<div className="flex flex-1 flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-end">
@@ -517,191 +574,198 @@ export default function TemplatesPage() {
 								<FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
 								<p className="text-sm text-muted-foreground">
 									{isHomeView
-										? 'No templates yet. Create your first template to get started.'
+										? 'No templates yet. Sync with Meta to bring templates into your workspace.'
 										: 'No templates inside this folder.'}
 								</p>
 							</div>
 						) : (
 							<div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-								<div className="flex-none overflow-x-auto">
-									<table className="w-full text-sm">
-										<thead className="border-b bg-muted/30 text-xs uppercase text-muted-foreground">
-											<tr>
-												{canMultiSelect && (
-													<th className="w-12 px-4 py-3">
-														<Checkbox
-															checked={headerCheckboxState}
-															onCheckedChange={(value) =>
-																handleSelectAllVisible(value === true)
-															}
-															aria-label="Select all templates"
-														/>
+								<div className="flex-1 overflow-hidden">
+									<div className="max-h-[420px] overflow-auto rounded-b-lg">
+										<table className="min-w-full border-collapse text-sm">
+											<thead className="sticky top-0 z-10 border-b bg-muted/30 text-xs uppercase text-muted-foreground">
+												<tr>
+													{canMultiSelect && (
+														<th className="w-12 px-4 py-3">
+															<Checkbox
+																checked={headerCheckboxState}
+																onCheckedChange={(value) =>
+																	handleSelectAllVisible(value === true)
+																}
+																aria-label="Select all templates"
+															/>
+														</th>
+													)}
+													<th className="px-6 py-3 text-left font-medium">Template name</th>
+													<th className="px-4 py-3 text-left font-medium">Template content</th>
+													<th className="px-4 py-3 text-left font-medium">Category</th>
+													<th className="px-4 py-3 text-left font-medium">Language</th>
+													<th className="px-4 py-3 text-left font-medium">Status</th>
+													<th className="px-6 py-3 text-right font-medium">
+														<span className="sr-only">Actions</span>
 													</th>
-												)}
-												<th className="px-6 py-3 text-left font-medium">Name / Language</th>
-												<th className="px-4 py-3 text-left font-medium">Category</th>
-												<th className="px-4 py-3 text-left font-medium">Message</th>
-												<th className="px-4 py-3 text-left font-medium">Status</th>
-												<th className="px-6 py-3 text-right font-medium">Actions</th>
-											</tr>
-										</thead>
-									</table>
-								</div>
-								<div className="flex-1 overflow-auto max-h-[380px] rounded-b-lg">
-									<table className="w-full text-sm">
-										<tbody>
-											{combinedRows.map((row) => {
-												if (row.type === 'folder') {
+												</tr>
+											</thead>
+											<tbody>
+												{combinedRows.map((row) => {
+													if (row.type === 'folder') {
+														return (
+															<tr
+																key={row.folder.id}
+																className="cursor-pointer border-b last:border-b-0 transition-colors hover:bg-muted/20"
+																onClick={() => setCurrentFolderId(row.folder.id)}>
+																{canMultiSelect && <td className="px-4 py-4" />}
+																<td className="px-6 py-4">
+																	<div className="flex items-center gap-3">
+																		<div className="rounded-md border bg-background p-2 text-muted-foreground">
+																			<Folder className="h-4 w-4" />
+																		</div>
+																		<div>
+																			<p className="font-medium capitalize">{row.folder.name}</p>
+																			<p className="text-xs text-muted-foreground">
+																				{row.folder.description}
+																			</p>
+																		</div>
+																	</div>
+																</td>
+																<td className="px-4 py-4 text-muted-foreground">—</td>
+																<td className="px-4 py-4 text-muted-foreground">—</td>
+																<td className="px-4 py-4 text-muted-foreground">—</td>
+																<td className="px-4 py-4 text-muted-foreground">—</td>
+																<td
+																	className="px-6 py-4 text-right"
+																	onClick={(event) => event.stopPropagation()}>
+																	{row.folder.count > 0 ? (
+																		<Button
+																			variant="ghost"
+																			size="icon"
+																			disabled
+																			aria-label="Folder actions">
+																			<MoreVertical className="h-4 w-4" />
+																		</Button>
+																	) : (
+																		<DropdownMenu>
+																			<DropdownMenuTrigger asChild>
+																				<Button
+																					variant="ghost"
+																					size="icon"
+																					aria-label="Folder actions"
+																					disabled={
+																						deleteFolderMutation.isPending &&
+																						folderDeleteTarget !== row.folder.id
+																					}>
+																					<MoreVertical className="h-4 w-4" />
+																				</Button>
+																			</DropdownMenuTrigger>
+																			<DropdownMenuContent align="end">
+																				<DropdownMenuLabel>Folder actions</DropdownMenuLabel>
+																				<DropdownMenuItem
+																					className="text-destructive focus:text-destructive"
+																					disabled={
+																						deleteFolderMutation.isPending &&
+																						folderDeleteTarget !== row.folder.id
+																					}
+																					onClick={() => deleteFolderMutation.mutate(row.folder.id)}>
+																					<Trash2 className="mr-2 h-4 w-4" />
+																					Delete folder
+																				</DropdownMenuItem>
+																			</DropdownMenuContent>
+																		</DropdownMenu>
+																	)}
+																</td>
+															</tr>
+														)
+													}
+
+													const template = row.template
 													return (
-														<tr
-															key={row.folder.id}
-															className="cursor-pointer border-b last:border-b-0 transition-colors hover:bg-muted/20"
-															onClick={() => setCurrentFolderId(row.folder.id)}>
-															{canMultiSelect && <td className="px-4 py-4" />}
-															<td className="px-6 py-4">
-																<div className="flex items-center gap-3">
-																	<div className="rounded-md border bg-background p-2 text-muted-foreground">
-																		<Folder className="h-4 w-4" />
-																	</div>
-																	<div>
-																		<p className="font-medium capitalize">{row.folder.name}</p>
-																		<p className="text-xs text-muted-foreground">
-																			{row.folder.description}
-																		</p>
-																	</div>
+														<tr key={template.id} className="border-b last:border-b-0 align-top">
+															{canMultiSelect && (
+																<td className="px-4 py-4 align-top">
+																	<Checkbox
+																		checked={selectedTemplates.has(template.id)}
+																		onCheckedChange={(value) =>
+																			toggleTemplateSelection(template.id, value === true)
+																		}
+																		aria-label={`Select ${template.name}`}
+																	/>
+																</td>
+															)}
+															<td className="px-6 py-4 align-top">
+																<p className="font-semibold leading-snug">
+																	{template.metaTemplateName}
+																</p>
+															</td>
+															<td className="px-4 py-4">
+																<TemplateBodyCell bodyText={template.bodyText} />
+															</td>
+															<td className="px-4 py-4">
+																<Badge variant="outline" className="bg-amber-50 text-amber-700">
+																	{template.category}
+																</Badge>
+															</td>
+															<td className="px-4 py-4">
+																<div className="flex flex-col">
+																	<span className="font-medium capitalize">
+																		{template.language || 'en'}
+																	</span>
+																	<span className="text-xs text-muted-foreground">
+																		{template.metaAccount.displayName}
+																	</span>
 																</div>
 															</td>
-															<td className="px-4 py-4 text-muted-foreground">
-																{row.folder.count} templates
-															</td>
-															<td className="px-4 py-4 text-muted-foreground">—</td>
-															<td className="px-4 py-4 text-muted-foreground">—</td>
+															<td className="px-4 py-4">{statusPill(template.status)}</td>
 															<td
 																className="px-6 py-4 text-right"
 																onClick={(event) => event.stopPropagation()}>
-																{row.folder.count > 0 ? (
-																	<Button
-																		variant="ghost"
-																		size="icon"
-																		disabled
-																		aria-label="Folder actions">
-																		<MoreVertical className="h-4 w-4" />
-																	</Button>
-																) : (
-																	<DropdownMenu>
-																		<DropdownMenuTrigger asChild>
-																			<Button
-																				variant="ghost"
-																				size="icon"
-																				aria-label="Folder actions"
-																				disabled={
-																					deleteFolderMutation.isPending &&
-																					folderDeleteTarget !== row.folder.id
-																				}>
-																				<MoreVertical className="h-4 w-4" />
-																			</Button>
-																		</DropdownMenuTrigger>
-																		<DropdownMenuContent align="end">
-																			<DropdownMenuLabel>Folder actions</DropdownMenuLabel>
-																			<DropdownMenuItem
-																				className="text-destructive focus:text-destructive"
-																				disabled={
-																					deleteFolderMutation.isPending &&
-																					folderDeleteTarget !== row.folder.id
-																				}
-																				onClick={() => deleteFolderMutation.mutate(row.folder.id)}>
-																				<Trash2 className="mr-2 h-4 w-4" />
-																				Delete folder
-																			</DropdownMenuItem>
-																		</DropdownMenuContent>
-																	</DropdownMenu>
-																)}
+																<DropdownMenu>
+																	<DropdownMenuTrigger asChild>
+																		<Button
+																			variant="ghost"
+																			size="icon"
+																			aria-label="Template actions">
+																			<MoreVertical className="h-4 w-4" />
+																		</Button>
+																	</DropdownMenuTrigger>
+																	<DropdownMenuContent align="end">
+																		<DropdownMenuLabel>Manage template</DropdownMenuLabel>
+																		<DropdownMenuItem disabled>Preview</DropdownMenuItem>
+																		<DropdownMenuSub>
+																			<DropdownMenuSubTrigger>
+																				Move to folder
+																			</DropdownMenuSubTrigger>
+																			<DropdownMenuSubContent className="w-48">
+																				<DropdownMenuItem
+																					onClick={() => handleMoveTemplate(template.id, null)}>
+																					No folder
+																				</DropdownMenuItem>
+																				{folderOptionsForDialog.map((folder) => (
+																					<DropdownMenuItem
+																						key={folder.id}
+																						onClick={() =>
+																							handleMoveTemplate(template.id, folder.id)
+																						}>
+																						{folder.name}
+																					</DropdownMenuItem>
+																				))}
+																			</DropdownMenuSubContent>
+																		</DropdownMenuSub>
+																		<DropdownMenuSeparator />
+																		<DropdownMenuItem
+																			className="text-destructive focus:text-destructive"
+																			onClick={() => deleteTemplateMutation.mutate(template.id)}>
+																			<Trash2 className="mr-2 h-4 w-4" />
+																			Delete
+																		</DropdownMenuItem>
+																	</DropdownMenuContent>
+																</DropdownMenu>
 															</td>
 														</tr>
 													)
-												}
-
-												const template = row.template
-												return (
-													<tr key={template.id} className="border-b last:border-b-0">
-														{canMultiSelect && (
-															<td className="px-4 py-4 align-top">
-																<Checkbox
-																	checked={selectedTemplates.has(template.id)}
-																	onCheckedChange={(value) =>
-																		toggleTemplateSelection(template.id, value === true)
-																	}
-																	aria-label={`Select ${template.name}`}
-																/>
-															</td>
-														)}
-														<td className="px-6 py-4">
-															<div>
-																<p className="font-medium">{template.name}</p>
-																<p className="text-xs uppercase text-muted-foreground">
-																	{template.language || 'en'}
-																</p>
-															</div>
-														</td>
-														<td className="px-4 py-4">
-															<Badge variant="outline" className="bg-amber-50 text-amber-700">
-																{template.category}
-															</Badge>
-														</td>
-														<td className="px-4 py-4 text-muted-foreground">
-															<p className="line-clamp-1 md:line-clamp-2">
-																{template.bodyText}
-															</p>
-														</td>
-														<td className="px-4 py-4">{statusPill(template.status)}</td>
-														<td
-															className="px-6 py-4 text-right"
-															onClick={(event) => event.stopPropagation()}>
-															<DropdownMenu>
-																<DropdownMenuTrigger asChild>
-																	<Button
-																		variant="ghost"
-																		size="icon"
-																		aria-label="Template actions">
-																		<MoreVertical className="h-4 w-4" />
-																	</Button>
-																</DropdownMenuTrigger>
-																<DropdownMenuContent align="end">
-																	<DropdownMenuLabel>Manage template</DropdownMenuLabel>
-																	<DropdownMenuItem disabled>Preview</DropdownMenuItem>
-																	<DropdownMenuSub>
-																		<DropdownMenuSubTrigger>
-																			Move to folder
-																		</DropdownMenuSubTrigger>
-																		<DropdownMenuSubContent className="w-48">
-																			<DropdownMenuItem
-																				onClick={() => handleMoveTemplate(template.id, null)}>
-																				No folder
-																			</DropdownMenuItem>
-																			{folderOptionsForDialog.map((folder) => (
-																				<DropdownMenuItem
-																					key={folder.id}
-																					onClick={() => handleMoveTemplate(template.id, folder.id)}>
-																					{folder.name}
-																				</DropdownMenuItem>
-																			))}
-																		</DropdownMenuSubContent>
-																	</DropdownMenuSub>
-																	<DropdownMenuSeparator />
-																	<DropdownMenuItem
-																		className="text-destructive focus:text-destructive"
-																		onClick={() => deleteTemplateMutation.mutate(template.id)}>
-																		<Trash2 className="mr-2 h-4 w-4" />
-																		Delete
-																	</DropdownMenuItem>
-																</DropdownMenuContent>
-															</DropdownMenu>
-														</td>
-													</tr>
-												)
-											})}
-										</tbody>
-									</table>
+												})}
+											</tbody>
+										</table>
+									</div>
 								</div>
 							</div>
 						)}
@@ -721,11 +785,6 @@ export default function TemplatesPage() {
 				</Card>
 			</div>
 
-			<AddTemplateDialog
-				open={isAddDialogOpen}
-				onOpenChange={setIsAddDialogOpen}
-				folders={folderOptionsForDialog}
-			/>
 			<AddFolderDialog
 				open={isAddFolderDialogOpen}
 				onOpenChange={setIsAddFolderDialogOpen}
