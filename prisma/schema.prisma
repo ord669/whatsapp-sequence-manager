@@ -1,0 +1,302 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Meta Connection Management
+model MetaAccount {
+  id String @id @default(cuid())
+
+  // Business Manager (optional - for display)
+  businessManagerId   String?
+  businessManagerName String?
+
+  // WhatsApp Business Account (WABA)
+  wabaId   String
+  wabaName String
+
+  // Phone Number
+  phoneNumberId String
+  phoneNumber   String // Display number: +1 555 040 3052
+  displayName   String // Verified business name
+  qualityRating String? // GREEN, YELLOW, RED
+
+  // Credentials
+  appId                  String
+  appSecret              String  @db.Text
+  accessToken            String  @db.Text // System User Access Token
+  chatwootAccountId      String?
+  chatwootInboxId        String?
+  chatwootApiAccessToken String? @db.Text
+
+  // Status
+  isActive   Boolean @default(true)
+  isVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sequences Sequence[]
+  templates Template[]
+
+  @@unique([wabaId, phoneNumberId])
+}
+
+// Contact Management
+model Contact {
+  id                     String   @id @default(cuid())
+  phoneNumber            String   @unique // E.164 format: +1234567890
+  firstName              String
+  lastName               String
+  chatwootContactId      String?
+  chatwootInboxId        String?
+  chatwootSourceId       String?
+  chatwootConversationId String?
+  chatwootContactInboxId String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  subscriptions SequenceSubscription[]
+  sentMessages  SentMessage[]
+}
+
+// Template Management
+model Template {
+  id               String         @id @default(cuid())
+  name             String
+  metaTemplateId   String? // Facebook's template ID (null until approved)
+  metaTemplateName String // Template name in Meta
+  metaAccountId    String
+  metaAccount      MetaAccount    @relation(fields: [metaAccountId], references: [id], onDelete: Cascade)
+  language         String         @default("en")
+  category         String // UTILITY, MARKETING, AUTHENTICATION
+  folderId         String?
+  folder           TemplateFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  status           TemplateStatus @default(PENDING)
+  headerType       String? // TEXT, IMAGE, VIDEO, DOCUMENT
+  headerContent    String? // URL or text
+  bodyText         String // Template body with {{1}}, {{2}} variables
+  footerText       String?
+  buttons          Json? // CTA buttons if any
+  variables        Json // [{name: "firstName", example: "John"}]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  sequenceSteps SequenceStep[]
+
+  @@unique([metaAccountId, metaTemplateName])
+}
+
+model TemplateFolder {
+  id        String     @id @default(cuid())
+  name      String
+  sortOrder Int        @default(0)
+  templates Template[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name])
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Sequence Management - WITH VERSION CONTROL
+model Sequence {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  status      SequenceStatus @default(DRAFT) // DRAFT, ACTIVE, or INACTIVE
+  isActive    Boolean        @default(false) // Kept for backward compatibility
+
+  // Version Control
+  version             Int        @default(1)
+  parentSequenceId    String? // Original sequence this was versioned from
+  parentSequence      Sequence?  @relation("SequenceVersions", fields: [parentSequenceId], references: [id])
+  childVersions       Sequence[] @relation("SequenceVersions")
+  isMajorVersion      Boolean    @default(true) // false if only timing changed
+  versionNotes        String? // What changed
+  similarToVersionIds String[]   @default([]) // Array of sequence IDs that are marked as "same"
+
+  // Flow Layout (for React Flow)
+  flowLayout Json? // Store node positions and edges
+
+  metaAccountId String
+  metaAccount   MetaAccount @relation(fields: [metaAccountId], references: [id], onDelete: Cascade)
+
+  // Labels/Tags for filtering
+  labels String[] @default([])
+
+  // Soft Delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps         SequenceStep[]
+  subscriptions SequenceSubscription[]
+  analytics     SequenceAnalytics?
+}
+
+enum SequenceStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+// Sequence Analytics (for version comparison)
+model SequenceAnalytics {
+  id         String   @id @default(cuid())
+  sequenceId String
+  sequence   Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  totalSubscriptions Int    @default(0)
+  completedCount     Int    @default(0)
+  cancelledCount     Int    @default(0)
+  avgCompletionTime  Float? // in hours
+  messagesSent       Int    @default(0)
+  messagesDelivered  Int    @default(0)
+  messagesRead       Int    @default(0)
+  messagesFailed     Int    @default(0)
+
+  lastCalculatedAt DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([sequenceId])
+}
+
+// Sequence Step
+model SequenceStep {
+  id         String   @id @default(cuid())
+  sequenceId String
+  sequence   Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id])
+
+  // Flow Node Info
+  nodeId   String // Unique node ID for React Flow
+  nodeType NodeType @default(MESSAGE)
+
+  stepOrder      Int // Day/step number
+  subOrder       Int       @default(0) // For multiple messages same day (0, 1, 2...)
+  delayValue     Int // Number value for delay
+  delayUnit      DelayUnit // MINUTES, HOURS, DAYS
+  scheduledTime  String? // HH:MM format "09:00" (null for minute/hour-based delays)
+  variableValues Json // {"1": "{firstName}", "2": "CompanyName"}
+  burstTemplates Json?
+
+  // Position in flowchart
+  positionX Float?
+  positionY Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sequenceId, nodeId])
+}
+
+enum NodeType {
+  START
+  MESSAGE
+  DELAY
+  CONDITION
+  END
+}
+
+enum DelayUnit {
+  MINUTES
+  HOURS
+  DAYS
+}
+
+// Subscription tracking
+model SequenceSubscription {
+  id         String             @id @default(cuid())
+  contactId  String
+  contact    Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sequenceId String
+  sequence   Sequence           @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  status     SubscriptionStatus @default(ACTIVE)
+
+  // Current position in flowchart
+  currentNodeId String?
+
+  currentStep       Int       @default(0)
+  currentSubStep    Int       @default(0)
+  startedAt         DateTime  @default(now())
+  pausedAt          DateTime?
+  completedAt       DateTime?
+  lastMessageSentAt DateTime?
+  nextScheduledAt   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([contactId, sequenceId])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+// Message Tracking
+model SentMessage {
+  id             String        @id @default(cuid())
+  contactId      String
+  contact        Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  templateId     String
+  metaMessageId  String? // WhatsApp message ID
+  status         MessageStatus @default(PENDING)
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  failedAt       DateTime?
+  errorMessage   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+// Business Hours Configuration
+model BusinessHours {
+  id             String   @id @default(cuid())
+  timezone       String   @default("America/New_York")
+  mondayStart    String? // "09:00"
+  mondayEnd      String? // "17:00"
+  tuesdayStart   String?
+  tuesdayEnd     String?
+  wednesdayStart String?
+  wednesdayEnd   String?
+  thursdayStart  String?
+  thursdayEnd    String?
+  fridayStart    String?
+  fridayEnd      String?
+  saturdayStart  String? // null = closed
+  saturdayEnd    String?
+  sundayStart    String? // null = closed
+  sundayEnd      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
