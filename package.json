@@ -11,7 +11,11 @@
 		"db:studio": "prisma studio",
 		"db:generate": "prisma generate",
 		"scheduler": "tsx jobs/message-scheduler.ts",
-		"cleanup:demo-templates": "tsx scripts/remove-demo-templates.ts"
+		"cleanup:demo-templates": "tsx scripts/remove-demo-templates.ts",
+		"docker:prod": "docker compose up --build",
+		"docker:prod:down": "docker compose down",
+		"docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
+		"docker:dev:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down"
 	},
 	"dependencies": {
 		"@hello-pangea/dnd": "^16.6.0",
@@ -29,6 +33,7 @@
 		"axios": "^1.7.0",
 		"class-variance-authority": "^0.7.0",
 		"clsx": "^2.1.0",
+		"colorette": "^2.0.20",
 		"date-fns": "^3.6.0",
 		"date-fns-tz": "^3.1.0",
 		"deep-object-diff": "^1.1.9",

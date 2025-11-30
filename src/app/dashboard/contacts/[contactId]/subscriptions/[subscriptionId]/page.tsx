@@ -244,8 +244,8 @@ export default function ContactSequenceViewPage() {
 						Unsubscribe
 					</Button>
 				</CardHeader>
-				<CardContent>
-					<div className="flex flex-col items-center max-w-2xl mx-auto">
+				<CardContent className="max-h-[500px] overflow-y-auto">
+					<div className="flex flex-col items-center max-w-2xl mx-auto pb-4">
 						<div className="px-6 py-2 bg-green-100 text-green-700 rounded-full font-medium border-2 border-green-300">
 							Start
 						</div>

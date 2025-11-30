@@ -143,12 +143,12 @@ export function AddStepDialog({
 
 	const selectedTemplate = findTemplateById(formData.templateId)
 
-	const getTemplateVariables = (templateId: string) => {
+	const getTemplateVariables = (templateId: string): string[] => {
 		const template = findTemplateById(templateId)
-		if (!template) return []
-		return (template.bodyText.match(/\{\{\d+\}\}/g) || []).map((v: string) =>
-			v.replace(/\{|\}/g, '')
-		)
+		if (!template?.bodyText) return []
+		const matches = template.bodyText.match(/\{\{\d+\}\}/g)
+		if (!matches) return []
+		return matches.map((match: string) => match.replace(/\{|\}/g, ''))
 	}
 
 	const isVariableValueFilled = (value?: string) =>

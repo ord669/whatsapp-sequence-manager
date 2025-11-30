@@ -32,6 +32,7 @@ interface ContactRowProps {
 		firstName: string
 		lastName: string
 		offer?: string | null
+		chatwootContactId?: string | null
 		chatwootConversationId?: string | null
 		chatwootInboxId?: string | null
 		chatwootSourceId?: string | null

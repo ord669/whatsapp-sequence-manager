@@ -139,6 +139,18 @@ export async function POST(request: Request) {
           },
         },
       })
+
+      log.info(
+        {
+          action: 'subscription.reset',
+          subscriptionId: subscription.id,
+          contactId: subscription.contactId,
+          sequenceId: subscription.sequenceId,
+          sequenceName: subscription.sequence?.name,
+          nextScheduledAt: subscription.nextScheduledAt?.toISOString(),
+        },
+        'Subscription reset to sequence start'
+      )
     } else {
       subscription = await prisma.sequenceSubscription.create({
         data: {
@@ -157,6 +169,18 @@ export async function POST(request: Request) {
           },
         },
       })
+
+      log.info(
+        {
+          action: 'subscription.create',
+          subscriptionId: subscription.id,
+          contactId: subscription.contactId,
+          sequenceId: subscription.sequenceId,
+          sequenceName: subscription.sequence?.name,
+          nextScheduledAt: subscription.nextScheduledAt?.toISOString(),
+        },
+        'Subscription created'
+      )
     }
 
     return NextResponse.json(subscription, { status: 201 })

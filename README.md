@@ -20,7 +20,7 @@ A comprehensive platform to manage WhatsApp marketing sequences with automated m
 - PostgreSQL database
 - WhatsApp Business API credentials from Meta
 
-### Installation
+### Installation (local)
 
 1. Clone the repository:
 ```bash
@@ -33,12 +33,12 @@ cd whatsapp-sequence-manager
 npm install
 ```
 
-3. Create a `.env` file:
+3. Create an environment file (for local development you can name it `.env.local` or `.env`):
 ```bash
-cp .env.example .env
+cp env.example .env.local
 ```
 
-4. Update your `.env` file with your database connection:
+4. Update your environment file with your database connection:
 ```
 DATABASE_URL="postgresql://user:password@localhost:5432/whatsapp_sequence_manager"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -64,6 +64,30 @@ npm run dev
 ```
 
 7. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Run with Docker
+
+1. Copy the Docker environment template:
+   ```bash
+   cp env.docker.example .env
+   ```
+2. Build and start all services (Next.js app, scheduler worker, PostgreSQL):
+   ```bash
+   docker compose up --build
+   ```
+   The first `app` container start will automatically push the Prisma schema to the database.
+3. Visit [http://localhost:3000](http://localhost:3000) once the build finishes.
+4. Tail logs from individual services if needed:
+   ```bash
+   docker compose logs -f app
+   docker compose logs -f scheduler
+   ```
+5. Shut everything down:
+   ```bash
+   docker compose down
+   ```
+
+> For local (non-Docker) development, copy `env.example` to `.env.local` (or `.env`) and adjust values as needed.
 
 ## Meta/WhatsApp API Setup
 

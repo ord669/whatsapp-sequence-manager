@@ -28,6 +28,7 @@ interface Contact {
 	lastName: string
 	offer?: string | null
 	createdAt: string
+	chatwootContactId?: string | null
 	chatwootConversationId?: string | null
 	chatwootInboxId?: string | null
 	chatwootSourceId?: string | null

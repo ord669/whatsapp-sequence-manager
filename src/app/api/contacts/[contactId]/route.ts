@@ -62,6 +62,19 @@ export async function PUT(
 			},
 		})
 
+		log.info(
+			{
+				action: 'PUT',
+				contactId: params.contactId,
+				changes: {
+					firstName,
+					lastName,
+					offer: sanitizedOffer,
+				},
+			},
+			'Contact updated'
+		)
+
 		return NextResponse.json(contact)
 	} catch (error) {
 		log.error({ err: toError(error), action: 'PUT', contactId: params.contactId }, 'Error updating contact')
@@ -77,6 +90,11 @@ export async function DELETE(
 		await prisma.contact.delete({
 			where: { id: params.contactId },
 		})
+
+		log.info(
+			{ action: 'DELETE', contactId: params.contactId },
+			'Contact deleted'
+		)
 
 		return NextResponse.json({ success: true })
 	} catch (error) {

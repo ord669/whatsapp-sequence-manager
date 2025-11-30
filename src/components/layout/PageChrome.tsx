@@ -15,6 +15,7 @@ interface PageChromeProps {
   filtersContent?: ReactNode
   footerContent?: ReactNode
   emptyFiltersMessage?: string
+  showSearchSection?: boolean
 }
 
 /**
@@ -35,30 +36,38 @@ export function PageChrome({
   filtersContent,
   footerContent,
   emptyFiltersMessage = 'This view has no search or filter controls yet.',
+  showSearchSection = true,
 }: PageChromeProps) {
   const hasSearchSlots = Boolean(searchContent || filtersContent)
-  const gridTemplate = footerContent ? 'grid-rows-[auto_auto_minmax(0,1fr)_auto]' : 'grid-rows-[auto_auto_minmax(0,1fr)]'
+  const gridTemplate = (() => {
+    if (showSearchSection) {
+      return footerContent ? 'grid-rows-[auto_auto_minmax(0,1fr)_auto]' : 'grid-rows-[auto_auto_minmax(0,1fr)]'
+    }
+    return footerContent ? 'grid-rows-[auto_minmax(0,1fr)_auto]' : 'grid-rows-[auto_minmax(0,1fr)]'
+  })()
 
   return (
     <div className={cn('grid h-full min-h-0 flex-1 gap-6', gridTemplate, className)}>
       <PageHeader title={title} description={description} badge={badge} actions={headerActions} />
 
-      <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.8)] md:p-6">
-        {hasSearchSlots ? (
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            {searchContent && <div className="w-full flex-1">{searchContent}</div>}
-            {filtersContent && (
-              <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
-                {filtersContent}
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">{emptyFiltersMessage}</p>
-        )}
-      </section>
+      {showSearchSection && (
+        <section className="rounded-[28px] border border-slate-200/70 bg-white p-4 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.8)] md:p-6">
+          {hasSearchSlots ? (
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              {searchContent && <div className="w-full flex-1">{searchContent}</div>}
+              {filtersContent && (
+                <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
+                  {filtersContent}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{emptyFiltersMessage}</p>
+          )}
+        </section>
+      )}
 
-      <div className="min-h-0 overflow-hidden">
+      <div className="h-full min-h-0 overflow-hidden">
         <div className="flex h-full flex-col gap-6 overflow-y-auto pr-1">{children}</div>
       </div>
 

@@ -156,6 +156,15 @@ export async function POST(request: Request) {
       },
     })
 
+    log.info(
+      {
+        action: 'POST',
+        contactId: contact.id,
+        phoneNumber: parsedPhone,
+      },
+      'Contact created'
+    )
+
     return NextResponse.json(contact, { status: 201 })
   } catch (error) {
     log.error({ err: toError(error), action: 'POST' }, 'Error creating contact')

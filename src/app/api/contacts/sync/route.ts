@@ -268,10 +268,22 @@ async function upsertChatwootContact(remoteContact: ChatwootContact): Promise<Up
 			data: updateData,
 		})
 
+		log.info(
+			{
+				action: 'sync.update',
+				contactId: existing.id,
+				phoneNumber,
+				firstName,
+				lastName,
+				offer: offer ?? existing.offer,
+			},
+			'Synced contact (updated)'
+		)
+
 		return 'updated'
 	}
 
-	await prisma.contact.create({
+	const created = await prisma.contact.create({
 		data: {
 			phoneNumber,
 			firstName,
@@ -280,6 +292,18 @@ async function upsertChatwootContact(remoteContact: ChatwootContact): Promise<Up
 			...chatwootFields,
 		},
 	})
+
+	log.info(
+		{
+			action: 'sync.create',
+			contactId: created.id,
+			phoneNumber,
+			firstName,
+			lastName,
+			offer: offer ?? null,
+		},
+		'Synced contact (created)'
+	)
 
 	return 'created'
 }

@@ -11,6 +11,8 @@ export const metadata: Metadata = {
 	description: 'Manage WhatsApp marketing sequences with ease',
 }
 
+export const dynamic = 'force-dynamic'
+
 export default function RootLayout({
 	children,
 }: {

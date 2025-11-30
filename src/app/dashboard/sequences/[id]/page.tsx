@@ -74,8 +74,9 @@ export default function ViewSequencePage() {
 	return (
 		<PageChrome
 			title={sequence.name}
-			description={sequence.description || 'Sequence overview'}
+			description={sequence.description || undefined}
 			badge={<StatusBadge variant={statusBadge.variant}>{statusBadge.label}</StatusBadge>}
+			showSearchSection={false}
 			headerActions={
 				<Link href="/dashboard/sequences">
 					<Button variant="ghost" size="sm">
@@ -83,11 +84,6 @@ export default function ViewSequencePage() {
 						Back to Sequences
 					</Button>
 				</Link>
-			}
-			searchContent={
-				<p className="text-sm text-muted-foreground">
-					Sequence insights are static—filters are not required for this view.
-				</p>
 			}
 			footerContent={
 				<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -136,12 +132,12 @@ export default function ViewSequencePage() {
 				</Card>
 			</div>
 
-			<Card className="flex-1">
+			<Card className="flex max-h-[60vh] flex-col overflow-hidden">
 				<CardHeader>
 					<CardTitle>Sequence Flow</CardTitle>
 				</CardHeader>
-				<CardContent>
-					<div className="mx-auto flex max-w-2xl flex-col items-center">
+				<CardContent className="flex-1 overflow-y-auto pb-0 pr-2 min-h-0">
+					<div className="mx-auto flex max-w-2xl flex-col items-center pb-4">
 						<div className="rounded-full border-2 border-green-300 bg-green-100 px-6 py-2 font-medium text-green-700">
 							Start
 						</div>
@@ -168,13 +164,23 @@ export default function ViewSequencePage() {
 											<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 text-sm font-bold text-white">
 												{step.stepOrder}
 											</div>
-											<div className="min-w-0 flex-1">
+											<div className="relative min-w-0 flex-1 group">
 												<div className="truncate font-medium">
 													{step.template?.name || 'No template selected'}
 												</div>
-												<div className="truncate text-sm text-gray-500">
-													{step.template?.category || 'MESSAGE'}
-												</div>
+												{!step.template?.name && (
+													<div className="text-sm text-orange-500">No template selected</div>
+												)}
+												{step.template?.bodyText && (
+													<div className="pointer-events-auto absolute left-0 top-full z-20 mt-2 hidden w-72 max-w-[80vw] rounded-md border bg-background p-3 text-sm text-foreground shadow-lg group-hover:block group-focus-within:block">
+														<p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+															Message preview
+														</p>
+														<div className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-muted-foreground/90">
+															{step.template.bodyText}
+														</div>
+													</div>
+												)}
 											</div>
 										</div>
 									</div>

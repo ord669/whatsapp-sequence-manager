@@ -117,6 +117,28 @@ npm run scheduler
 ```
 This processes scheduled messages every minute.
 
+### 5. Run with Docker
+
+**Production-style build (default `docker-compose.yml`):**
+```bash
+# start
+docker compose up --build
+# stop
+docker compose down
+```
+Runs the optimized Next.js build plus the scheduler with structured JSON logs.
+
+**Developer experience (hot reload + colorful logs):**
+```bash
+# start
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# stop
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+- Mounts your source tree for live reloads  
+- Executes `npm run dev` inside the container  
+- Forces `LOG_PRETTY=true` so you see the colorized logger output even though Docker sets `NODE_ENV=development`
+
 ---
 
 ## 📱 How to Use

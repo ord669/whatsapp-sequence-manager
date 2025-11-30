@@ -27,6 +27,7 @@ export async function GET() {
               select: {
                 name: true,
                 metaTemplateName: true,
+                bodyText: true,
               },
             },
           },
